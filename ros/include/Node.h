@@ -57,16 +57,19 @@ class Node
 
   private:
     void PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points);
+    void PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker);
     void PublishPositionAsTransform (cv::Mat position);
     void PublishPositionAsPoseStamped(cv::Mat position);
     void PublishRenderedImage (cv::Mat image);
     void ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level);
     tf::Transform TransformFromMat (cv::Mat position_mat);
     sensor_msgs::PointCloud2 MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points);
+    cv::Mat ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker);
 
     dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig> dynamic_param_server_;
 
     image_transport::Publisher rendered_image_publisher_;
+    image_transport::Publisher sparse_depth_publisher_;
     ros::Publisher map_points_publisher_;
     ros::Publisher pose_publisher_;
 
@@ -78,6 +81,8 @@ class Node
     bool publish_pointcloud_param_;
     bool publish_pose_param_;
     int min_observations_per_point_;
+
+    cv::Mat mSparseDepthIm;
 };
 
 #endif //ORBSLAM2_ROS_NODE_H_

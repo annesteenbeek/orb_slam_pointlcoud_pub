@@ -20,6 +20,7 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
   dynamic_param_server_.setCallback(dynamic_param_callback);
 
   rendered_image_publisher_ = image_transport.advertise (name_of_node_+"/debug_image", 1);
+  // sparse_depth_publisher_ = image_transport.advertise (name_of_node_+"/sparse_depth", 1);
   if (publish_pointcloud_param_) {
     map_points_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2> (name_of_node_+"/map_points", 1);
   }
@@ -28,6 +29,8 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
   if (publish_pose_param_) {
     pose_publisher_ = node_handle_.advertise<geometry_msgs::PoseStamped> (name_of_node_+"/pose", 1);
   }
+
+  mSparseDepthIm = cv::Mat(480,640, CV_32F, cv::Scalar(0));
 }
 
 
@@ -53,6 +56,8 @@ void Node::Update () {
     PublishMapPoints (orb_slam_->GetAllMapPoints());
   }
 
+  // PublishSparseDepthImage(orb_slam_->GetTracker());
+
 }
 
 
@@ -61,6 +66,14 @@ void Node::PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points) {
   map_points_publisher_.publish (cloud);
 }
 
+void Node::PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker) {
+  cv::Mat image = ProjectMapPointsInFrame(pTracker);
+  std_msgs::Header header;
+  header.stamp = current_frame_time_;
+  header.frame_id = map_frame_id_param_;
+  const sensor_msgs::ImagePtr sparse_depth_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+  sparse_depth_publisher_.publish(sparse_depth_msg);
+}
 
 void Node::PublishPositionAsTransform (cv::Mat position) {
   tf::Transform transform = TransformFromMat (position);
@@ -167,6 +180,58 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
   return cloud;
 }
 
+cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
+  vector<cv::KeyPoint> mvCurrentKeys=pTracker->mCurrentFrame.mvKeysUn;
+  std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=pTracker->mCurrentFrame.mvpMapPoints;
+  const int N = mvCurrentKeys.size();
+
+  cv::Mat im;
+  mSparseDepthIm.copyTo(im);
+
+  if(pTracker->mLastProcessedState==ORB_SLAM2::Tracking::OK)
+  {
+      for(int i=0;i<N;i++)
+      {
+          ORB_SLAM2::MapPoint* pMP = mvpCurrentMapPoints[i];
+          if(pMP)
+          {
+              if(!pTracker->mCurrentFrame.mvbOutlier[i])
+              {
+                // 3D in absolute coordinates
+                cv::Mat P = pMP->GetWorldPos(); 
+
+                // 3D in camera coordinates
+                cv::Mat mRcw = pTracker->mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3);
+                cv::Mat mtcw = pTracker->mCurrentFrame.mTcw.rowRange(0,3).col(3);
+                cv::Mat mOw = -mRcw.t()*mtcw;
+
+                const cv::Mat Pc = mRcw*P+mtcw;
+                const float &PcX = Pc.at<float>(0);
+                const float &PcY= Pc.at<float>(1);
+                const float &PcZ = Pc.at<float>(2);
+
+                // Check positive depth
+                if(PcZ<0.0f)
+                  continue;
+
+                // Check distance is in the scale invariance region of the MapPoint
+                const float maxDistance = pMP->GetMaxDistanceInvariance();
+                const float minDistance = pMP->GetMinDistanceInvariance();
+                const cv::Mat PO = P-mOw;
+                float dist = cv::norm(PO);
+
+                if(dist<minDistance || dist>maxDistance)
+                  continue;
+
+                im.at<float>(mvCurrentKeys[i].pt) = dist;
+
+              }
+          }
+      }
+  }
+
+  return im;
+}
 
 void Node::ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level) {
   orb_slam_->EnableLocalizationOnly (config.localize_only);

@@ -121,6 +121,8 @@ public:
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
 
+    Tracking* GetTracker();
+
     cv::Mat DrawCurrentFrame ();
 
     std::vector<MapPoint*> GetAllMapPoints();

@@ -485,6 +485,11 @@ cv::Mat System::DrawCurrentFrame () {
   return mpFrameDrawer->DrawFrame();
 }
 
+Tracking* System::GetTracker () {
+    unique_lock<mutex> lock(mMutexState);
+    return mpTracker;
+}
+
 std::vector<MapPoint*> System::GetAllMapPoints() {
   return mpMap->GetAllMapPoints();
 }
