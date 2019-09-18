@@ -20,7 +20,7 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
   dynamic_param_server_.setCallback(dynamic_param_callback);
 
   rendered_image_publisher_ = image_transport.advertise (name_of_node_+"/debug_image", 1);
-  // sparse_depth_publisher_ = image_transport.advertise (name_of_node_+"/sparse_depth", 1);
+  sparse_depth_publisher_ = image_transport.advertise (name_of_node_+"/sparse_depth", 1);
   if (publish_pointcloud_param_) {
     map_points_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2> (name_of_node_+"/map_points", 1);
   }
@@ -30,7 +30,7 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
     pose_publisher_ = node_handle_.advertise<geometry_msgs::PoseStamped> (name_of_node_+"/pose", 1);
   }
 
-  mSparseDepthIm = cv::Mat(480,640, CV_32F, cv::Scalar(0));
+  mSparseDepthIm = cv::Mat::zeros(480,640, CV_32F);
 }
 
 
@@ -56,7 +56,7 @@ void Node::Update () {
     PublishMapPoints (orb_slam_->GetAllMapPoints());
   }
 
-  // PublishSparseDepthImage(orb_slam_->GetTracker());
+  PublishSparseDepthImage(orb_slam_->GetTracker());
 
 }
 
@@ -71,7 +71,7 @@ void Node::PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker) {
   std_msgs::Header header;
   header.stamp = current_frame_time_;
   header.frame_id = map_frame_id_param_;
-  const sensor_msgs::ImagePtr sparse_depth_msg = cv_bridge::CvImage(header, "bgr8", image).toImageMsg();
+  const sensor_msgs::ImagePtr sparse_depth_msg = cv_bridge::CvImage(header, "32FC1", image).toImageMsg();
   sparse_depth_publisher_.publish(sparse_depth_msg);
 }
 
@@ -224,6 +224,7 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
                   continue;
 
                 im.at<float>(mvCurrentKeys[i].pt) = dist;
+                // im.at<float>(mvCurrentKeys[i].pt) = 0.5;
 
               }
           }

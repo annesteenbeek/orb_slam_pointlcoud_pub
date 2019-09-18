@@ -1,11 +1,16 @@
 <launch>
+  <param name="use_sim_time" type="bool" value="True"/>     
+  <node pkg="rosbag" type="play" name="player" output="screen" args="--clock /mnt/dataLinux/rosbags/MH_02_easy.bag" />
+  <!-- <node pkg="rosbag" type="play" name="player" output="screen" args="-clock /mnt/dataLinux/rosbags/MH_04_difficult.bag" /> -->
+
+
   <node name="orb_slam2_stereo" pkg="orb_slam2_ros"
       type="orb_slam2_ros_stereo" args="
           $(find orb_slam2_ros)/orb_slam2/Vocabulary/ORBvoc.txt
-          $(find orb_slam2_ros)/orb_slam2/config/RealSenseR200Stereo.yaml"
+          $(find octomap_nav)/conf/euroc.yaml"
       output="screen">
-       <remap from="image_left/image_color_rect" to="/cam_front/left/image_rect_color" />
-       <remap from="image_right/image_color_rect" to="/cam_front/right/image_rect_color" />
+       <remap from="image_left/image_color_rect" to="/cam0/image_raw" />
+       <remap from="image_right/image_color_rect" to="/cam1/image_raw" />
 
        <param name="publish_pointcloud" type="bool" value="true" />
        <param name="publish_pose" type="bool" value="true" />
