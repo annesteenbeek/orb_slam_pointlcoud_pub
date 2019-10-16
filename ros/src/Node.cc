@@ -30,7 +30,6 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
     pose_publisher_ = node_handle_.advertise<geometry_msgs::PoseStamped> (name_of_node_+"/pose", 1);
   }
 
-  mSparseDepthIm = cv::Mat::zeros(480,640, CV_32F);
 }
 
 
@@ -181,14 +180,18 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
 }
 
 cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
-  vector<cv::KeyPoint> mvCurrentKeys=pTracker->mCurrentFrame.mvKeysUn;
-  std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=pTracker->mCurrentFrame.mvpMapPoints;
-  const int N = mvCurrentKeys.size();
+  vector<cv::KeyPoint> mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
+  // vector<cv::KeyPoint> mvCurrentKeys=orb_slam_->GetTrackedKeyPointsUn();
+  // std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=pTracker->mCurrentFrame.mvpMapPoints;
+  std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=orb_slam_->GetTrackedMapPoints();
+  int mTrackingState = orb_slam_->GetTrackingState();
+  int N = mvCurrentKeys.size();
 
-  cv::Mat im;
-  mSparseDepthIm.copyTo(im);
+  cv::Mat im = cv::Mat::zeros(480,640, CV_32F);
+  // cv::Mat im = cv::Mat::zeros(720,960, CV_32F);
+  // TODO: handle different inmage sizes, maybe publish pointclouds?
 
-  if(pTracker->mLastProcessedState==ORB_SLAM2::Tracking::OK)
+  if(mTrackingState==ORB_SLAM2::Tracking::OK)
   {
       for(int i=0;i<N;i++)
       {
@@ -201,18 +204,24 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
                 cv::Mat P = pMP->GetWorldPos(); 
 
                 // 3D in camera coordinates
-                cv::Mat mRcw = pTracker->mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3);
-                cv::Mat mtcw = pTracker->mCurrentFrame.mTcw.rowRange(0,3).col(3);
+                cv::Mat mTcw = orb_slam_->GetCurrentPosition();
+                cv::Mat mRcw = mTcw.rowRange(0,3).colRange(0,3);
+                cv::Mat mtcw = mTcw.rowRange(0,3).col(3);
                 cv::Mat mOw = -mRcw.t()*mtcw;
+
 
                 const cv::Mat Pc = mRcw*P+mtcw;
                 const float &PcX = Pc.at<float>(0);
                 const float &PcY= Pc.at<float>(1);
                 const float &PcZ = Pc.at<float>(2);
 
+
+                // std::printf("%g\n", PcZ);
                 // Check positive depth
                 if(PcZ<0.0f)
                   continue;
+
+                // Error free up till here
 
                 // Check distance is in the scale invariance region of the MapPoint
                 const float maxDistance = pMP->GetMaxDistanceInvariance();
@@ -220,12 +229,12 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
                 const cv::Mat PO = P-mOw;
                 float dist = cv::norm(PO);
 
+
                 if(dist<minDistance || dist>maxDistance)
                   continue;
 
+                // cout << mvCurrentKeys[i].pt.x << ", " << mvCurrentKeys[i].pt.y << endl;
                 im.at<float>(mvCurrentKeys[i].pt) = dist;
-                // im.at<float>(mvCurrentKeys[i].pt) = 0.5;
-
               }
           }
       }
