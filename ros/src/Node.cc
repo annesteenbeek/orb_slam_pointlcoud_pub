@@ -23,6 +23,7 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
   sparse_depth_publisher_ = image_transport.advertise (name_of_node_+"/sparse_depth", 1);
   if (publish_pointcloud_param_) {
     map_points_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2> (name_of_node_+"/map_points", 1);
+    tracked_map_points_publisher_ = node_handle_.advertise<sensor_msgs::PointCloud2> (name_of_node_+"/tracked_map_points", 1);
   }
 
   // Enable publishing camera's pose as PoseStamped message
@@ -53,6 +54,7 @@ void Node::Update () {
 
   if (publish_pointcloud_param_) {
     PublishMapPoints (orb_slam_->GetAllMapPoints());
+    PublishTrackedMapPoints (orb_slam_->GetTrackedMapPoints());
   }
 
   PublishSparseDepthImage(orb_slam_->GetTracker());
@@ -63,6 +65,11 @@ void Node::Update () {
 void Node::PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points) {
   sensor_msgs::PointCloud2 cloud = MapPointsToPointCloud (map_points);
   map_points_publisher_.publish (cloud);
+}
+
+void Node::PublishTrackedMapPoints (std::vector<ORB_SLAM2::MapPoint*> tracked_map_points) {
+  sensor_msgs::PointCloud2 cloud = MapPointsToPointCloud (tracked_map_points);
+  tracked_map_points_publisher_.publish(cloud);
 }
 
 void Node::PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker) {
@@ -138,6 +145,14 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
     std::cout << "Map point vector is empty!" << std::endl;
   }
 
+  int full_size = 0;
+
+  for (int i = 0; i<map_points.size(); i++) {
+    if (map_points[i]) {
+      full_size++;
+    } 
+  }
+  
   sensor_msgs::PointCloud2 cloud;
 
   const int num_channels = 3; // x y z
@@ -145,7 +160,8 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
   cloud.header.stamp = current_frame_time_;
   cloud.header.frame_id = map_frame_id_param_;
   cloud.height = 1;
-  cloud.width = map_points.size();
+  // cloud.width = map_points.size();
+  cloud.width = full_size;
   cloud.is_bigendian = false;
   cloud.is_dense = true;
   cloud.point_step = num_channels * sizeof(float);
@@ -166,7 +182,7 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
 
   float data_array[3];
   for (unsigned int i=0; i<cloud.width; i++) {
-    if (map_points.at(i)->nObs >= min_observations_per_point_) {//nObs isBad()
+    if (map_points[i] && map_points.at(i)->nObs >= min_observations_per_point_) {//nObs isBad()
       data_array[0] = map_points.at(i)->GetWorldPos().at<float> (2); //x. Do the transformation by just reading at the position of z instead of x
       data_array[1] = -1.0* map_points.at(i)->GetWorldPos().at<float> (0); //y. Do the transformation by just reading at the position of x instead of y
       data_array[2] = -1.0* map_points.at(i)->GetWorldPos().at<float> (1); //z. Do the transformation by just reading at the position of y instead of z

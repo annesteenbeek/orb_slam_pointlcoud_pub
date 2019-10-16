@@ -57,6 +57,7 @@ class Node
 
   private:
     void PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points);
+    void PublishTrackedMapPoints(std::vector<ORB_SLAM2::MapPoint*> tracked_map_points);
     void PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker);
     void PublishPositionAsTransform (cv::Mat position);
     void PublishPositionAsPoseStamped(cv::Mat position);
@@ -71,6 +72,7 @@ class Node
     image_transport::Publisher rendered_image_publisher_;
     image_transport::Publisher sparse_depth_publisher_;
     ros::Publisher map_points_publisher_;
+    ros::Publisher tracked_map_points_publisher_;
     ros::Publisher pose_publisher_;
 
     std::string name_of_node_;
