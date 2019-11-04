@@ -57,8 +57,26 @@ void Node::Update () {
     PublishTrackedMapPoints (orb_slam_->GetTrackedMapPoints());
   }
 
-  PublishSparseDepthImage(orb_slam_->GetTracker());
+  // PublishSparseDepthImage(orb_slam_->GetTracker());
 
+  HandleKeyframes(orb_slam_->GetAllKeyFrames());
+
+}
+
+void Node::HandleKeyframes(vector<ORB_SLAM2::KeyFrame*> keyframes_in_map) {
+
+  vector<ORB_SLAM2::KeyFrame*> newKeyFrames;
+
+  set_difference(keyframes_in_map.begin(), keyframes_in_map.end(), 
+                stored_keyframes_.begin(), stored_keyframes_.end(),
+                inserter(newKeyFrames, newKeyFrames.begin()));
+
+  for (int i=0; i<newKeyFrames.size(); i++) {
+    // Only do depth calc for keyframes FIXME
+    PublishSparseDepthImage(orb_slam_->GetTracker());
+  }
+
+  stored_keyframes_ = keyframes_in_map;
 }
 
 
@@ -197,8 +215,6 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
 
 cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
   vector<cv::KeyPoint> mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
-  // vector<cv::KeyPoint> mvCurrentKeys=orb_slam_->GetTrackedKeyPointsUn();
-  // std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=pTracker->mCurrentFrame.mvpMapPoints;
   std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=orb_slam_->GetTrackedMapPoints();
   int mTrackingState = orb_slam_->GetTrackingState();
   int N = mvCurrentKeys.size();
@@ -232,12 +248,9 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
                 const float &PcZ = Pc.at<float>(2);
 
 
-                // std::printf("%g\n", PcZ);
                 // Check positive depth
                 if(PcZ<0.0f)
                   continue;
-
-                // Error free up till here
 
                 // Check distance is in the scale invariance region of the MapPoint
                 const float maxDistance = pMP->GetMaxDistanceInvariance();

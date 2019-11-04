@@ -127,6 +127,8 @@ public:
 
     std::vector<MapPoint*> GetAllMapPoints();
 
+    vector<KeyFrame*> GetAllKeyFrames();
+
 private:
     // This stops local mapping thread (map building) and performs only camera tracking.
     void ActivateLocalizationMode();

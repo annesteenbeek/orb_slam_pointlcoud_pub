@@ -481,6 +481,11 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
     return mTrackedKeyPointsUn;
 }
 
+vector<KeyFrame*> System::GetAllKeyFrames()
+{
+    return mpMap->GetAllKeyFrames();
+}
+
 cv::Mat System::DrawCurrentFrame () {
   return mpFrameDrawer->DrawFrame();
 }

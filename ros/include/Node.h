@@ -63,6 +63,7 @@ class Node
     void PublishPositionAsPoseStamped(cv::Mat position);
     void PublishRenderedImage (cv::Mat image);
     void ParamsChangedCallback(orb_slam2_ros::dynamic_reconfigureConfig &config, uint32_t level);
+    void HandleKeyframes(std::vector<ORB_SLAM2::KeyFrame*> keyframes_in_map);
     tf::Transform TransformFromMat (cv::Mat position_mat);
     sensor_msgs::PointCloud2 MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points);
     cv::Mat ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker);
@@ -85,6 +86,7 @@ class Node
     int min_observations_per_point_;
 
     cv::Mat mSparseDepthIm;
+    std::vector<ORB_SLAM2::KeyFrame*> stored_keyframes_;
 };
 
 #endif //ORBSLAM2_ROS_NODE_H_
