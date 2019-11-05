@@ -111,6 +111,7 @@ public:
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
 
+    void UpdateScale (float scale);
     void SetMinimumKeyFrames (int min_num_kf);
 
     cv::Mat GetCurrentPosition ();

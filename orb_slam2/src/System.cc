@@ -459,6 +459,10 @@ void System::SetMinimumKeyFrames (int min_num_kf) {
   mpTracker->SetMinimumKeyFrames(min_num_kf);
 }
 
+void System::UpdateScale(float scale) {
+    mpMap->UpdateScale(scale);
+}
+
 cv::Mat System::GetCurrentPosition () {
   return current_position_;
 }

@@ -38,6 +38,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/Float32.h>
 
 #include "System.h"
 
@@ -56,6 +57,7 @@ class Node
     ros::Time current_frame_time_;
 
   private:
+    void ScaleCallback (const std_msgs::Float32::ConstPtr& msg);
     void PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points);
     void PublishTrackedMapPoints(std::vector<ORB_SLAM2::MapPoint*> tracked_map_points);
     void PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker);
@@ -75,6 +77,7 @@ class Node
     ros::Publisher map_points_publisher_;
     ros::Publisher tracked_map_points_publisher_;
     ros::Publisher pose_publisher_;
+    ros::Subscriber scale_subscriber_;
 
     std::string name_of_node_;
     ros::NodeHandle node_handle_;

@@ -31,6 +31,9 @@ Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transp
     pose_publisher_ = node_handle_.advertise<geometry_msgs::PoseStamped> (name_of_node_+"/pose", 1);
   }
 
+  // Subscribe to scale changes
+  scale_subscriber_ = node_handle_.subscribe<std_msgs::Float32>(name_of_node_+"/scale", 10, &Node::ScaleCallback, this);
+
 }
 
 
@@ -61,6 +64,10 @@ void Node::Update () {
 
   HandleKeyframes(orb_slam_->GetAllKeyFrames());
 
+}
+
+void Node::ScaleCallback(const std_msgs::Float32::ConstPtr& msg) {
+  orb_slam_->UpdateScale(msg->data);
 }
 
 void Node::HandleKeyframes(vector<ORB_SLAM2::KeyFrame*> keyframes_in_map) {

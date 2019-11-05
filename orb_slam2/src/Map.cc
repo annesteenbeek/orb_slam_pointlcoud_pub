@@ -29,6 +29,26 @@ Map::Map():mnMaxKFid(0),mnBigChangeIdx(0)
 {
 }
 
+void Map::UpdateScale(const double &scale)
+{
+    unique_lock<mutex> lock(mMutexMapUpdate);
+    for(std::set<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
+    {
+        KeyFrame* pKF = *sit;
+        cv::Mat Tcw = pKF->GetPose();
+        cv::Mat tcw = Tcw.rowRange(0,3).col(3)*scale;
+        tcw.copyTo(Tcw.rowRange(0,3).col(3));
+        pKF->SetPose(Tcw);
+    }
+    for(std::set<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)
+    {
+        MapPoint* pMP = *sit;
+        //pMP->SetWorldPos(pMP->GetWorldPos()*scale);
+        pMP->UpdateScale(scale);
+    }
+    std::cout<<std::endl<<"... Map scale updated ..."<<std::endl<<std::endl;
+}
+
 void Map::AddKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);

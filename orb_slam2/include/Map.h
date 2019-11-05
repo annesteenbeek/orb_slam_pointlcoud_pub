@@ -40,6 +40,7 @@ class Map
 public:
     Map();
 
+    void UpdateScale(const double &scale);
     void AddKeyFrame(KeyFrame* pKF);
     void AddMapPoint(MapPoint* pMP);
     void EraseMapPoint(MapPoint* pMP);

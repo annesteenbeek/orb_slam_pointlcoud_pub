@@ -77,6 +77,13 @@ void MapPoint::SetWorldPos(const cv::Mat &Pos)
     Pos.copyTo(mWorldPos);
 }
 
+void MapPoint::UpdateScale(float scale)
+{
+    SetWorldPos(GetWorldPos()*scale);
+    mfMaxDistance *= scale;
+    mfMinDistance *= scale;
+}
+
 cv::Mat MapPoint::GetWorldPos()
 {
     unique_lock<mutex> lock(mMutexPos);
