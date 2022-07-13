@@ -47,7 +47,7 @@
 class Node
 {
   public:
-    Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport);
+    Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport, const std::string &strSettingsFile);
     ~Node ();
 
   protected:
@@ -61,6 +61,7 @@ class Node
     void PublishMapPoints (std::vector<ORB_SLAM2::MapPoint*> map_points);
     void PublishTrackedMapPoints(std::vector<ORB_SLAM2::MapPoint*> tracked_map_points);
     void PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker);
+    void PublishSparseDepthImage(ORB_SLAM2::KeyFrame *pKeyFrame);
     void PublishPositionAsTransform (cv::Mat position);
     void PublishPositionAsPoseStamped(cv::Mat position);
     void PublishRenderedImage (cv::Mat image);
@@ -69,6 +70,8 @@ class Node
     tf::Transform TransformFromMat (cv::Mat position_mat);
     sensor_msgs::PointCloud2 MapPointsToPointCloud (std::vector<ORB_SLAM2::MapPoint*> map_points);
     cv::Mat ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker);
+    cv::Mat ProjectMapPointsInFrame(ORB_SLAM2::KeyFrame *pKeyFrame);
+    cv::Mat SparseDepthFromKeyframe(ORB_SLAM2::KeyFrame *pKeyFrame);
 
     dynamic_reconfigure::Server<orb_slam2_ros::dynamic_reconfigureConfig> dynamic_param_server_;
 
@@ -88,8 +91,14 @@ class Node
     bool publish_pose_param_;
     int min_observations_per_point_;
 
+    int cWidth;
+    int cHeight;
+
+
+
     cv::Mat mSparseDepthIm;
     std::vector<ORB_SLAM2::KeyFrame*> stored_keyframes_;
+    std::size_t lastKeyFrameSize;
 };
 
 #endif //ORBSLAM2_ROS_NODE_H_

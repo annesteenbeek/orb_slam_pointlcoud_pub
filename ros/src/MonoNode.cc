@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     ros::NodeHandle node_handle;
     image_transport::ImageTransport image_transport (node_handle);
 
-    MonoNode node (&SLAM, node_handle, image_transport);
+    MonoNode node (&SLAM, node_handle, image_transport, argv[2]);
 
     ros::spin();
 
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 }
 
 
-MonoNode::MonoNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport) : Node (pSLAM, node_handle, image_transport) {
+MonoNode::MonoNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport, const string &strSettingsFile) : Node (pSLAM, node_handle, image_transport, strSettingsFile) {
   image_subscriber = image_transport.subscribe ("/camera/image_raw", 1, &MonoNode::ImageCallback, this);
 }
 

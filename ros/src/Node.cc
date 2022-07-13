@@ -2,11 +2,18 @@
 
 #include <iostream>
 
-Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport) {
+Node::Node (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport, const string &strSettingsFile) {
   name_of_node_ = ros::this_node::getName();
   orb_slam_ = pSLAM;
   node_handle_ = node_handle;
   min_observations_per_point_ = 2;
+  lastKeyFrameSize = 0;
+
+
+  cv::FileStorage fSettings(strSettingsFile, cv::FileStorage::READ);
+
+  cWidth = fSettings["Camera.width"];
+  cHeight = fSettings["Camera.height"];
 
   //static parameters
   node_handle_.param(name_of_node_+"/publish_pointcloud", publish_pointcloud_param_, true);
@@ -57,7 +64,7 @@ void Node::Update () {
 
   if (publish_pointcloud_param_) {
     PublishMapPoints (orb_slam_->GetAllMapPoints());
-    PublishTrackedMapPoints (orb_slam_->GetTrackedMapPoints());
+    // PublishTrackedMapPoints (orb_slam_->GetTrackedMapPoints());
   }
 
   // PublishSparseDepthImage(orb_slam_->GetTracker());
@@ -72,18 +79,16 @@ void Node::ScaleCallback(const std_msgs::Float32::ConstPtr& msg) {
 
 void Node::HandleKeyframes(vector<ORB_SLAM2::KeyFrame*> keyframes_in_map) {
 
-  vector<ORB_SLAM2::KeyFrame*> newKeyFrames;
+  size_t N = keyframes_in_map.size();
 
-  set_difference(keyframes_in_map.begin(), keyframes_in_map.end(), 
-                stored_keyframes_.begin(), stored_keyframes_.end(),
-                inserter(newKeyFrames, newKeyFrames.begin()));
-
-  for (int i=0; i<newKeyFrames.size(); i++) {
-    // Only do depth calc for keyframes FIXME
-    PublishSparseDepthImage(orb_slam_->GetTracker());
+  for ( size_t i = lastKeyFrameSize; i<N; i++){
+    // NOTE using keyframes is the more accurate method, however, this 
+    // can cause problems with the timing and syncing received images
+    // PublishSparseDepthImage(orb_slam_->GetTracker());
+    PublishSparseDepthImage(keyframes_in_map[i]);
   }
 
-  stored_keyframes_ = keyframes_in_map;
+  lastKeyFrameSize = N;
 }
 
 
@@ -101,7 +106,18 @@ void Node::PublishSparseDepthImage(ORB_SLAM2::Tracking *pTracker) {
   cv::Mat image = ProjectMapPointsInFrame(pTracker);
   std_msgs::Header header;
   header.stamp = current_frame_time_;
-  header.frame_id = map_frame_id_param_;
+  // header.frame_id = camera_frame_id_param_;
+  header.frame_id = "/openni_rgb_optical_frame";
+  const sensor_msgs::ImagePtr sparse_depth_msg = cv_bridge::CvImage(header, "32FC1", image).toImageMsg();
+  sparse_depth_publisher_.publish(sparse_depth_msg);
+}
+
+void Node::PublishSparseDepthImage(ORB_SLAM2::KeyFrame *pKeyFrame) {
+  cv::Mat image = ProjectMapPointsInFrame(pKeyFrame);
+  std_msgs::Header header;
+  header.stamp.fromSec(pKeyFrame->mTimeStamp);
+  // header.frame_id = camera_frame_id_param_;
+  header.frame_id = "/openni_rgb_optical_frame";
   const sensor_msgs::ImagePtr sparse_depth_msg = cv_bridge::CvImage(header, "32FC1", image).toImageMsg();
   sparse_depth_publisher_.publish(sparse_depth_msg);
 }
@@ -170,14 +186,6 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
     std::cout << "Map point vector is empty!" << std::endl;
   }
 
-  int full_size = 0;
-
-  for (int i = 0; i<map_points.size(); i++) {
-    if (map_points[i]) {
-      full_size++;
-    } 
-  }
-  
   sensor_msgs::PointCloud2 cloud;
 
   const int num_channels = 3; // x y z
@@ -185,8 +193,7 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
   cloud.header.stamp = current_frame_time_;
   cloud.header.frame_id = map_frame_id_param_;
   cloud.height = 1;
-  // cloud.width = map_points.size();
-  cloud.width = full_size;
+  cloud.width = map_points.size();
   cloud.is_bigendian = false;
   cloud.is_dense = true;
   cloud.point_step = num_channels * sizeof(float);
@@ -204,10 +211,10 @@ sensor_msgs::PointCloud2 Node::MapPointsToPointCloud (std::vector<ORB_SLAM2::Map
   cloud.data.resize(cloud.row_step * cloud.height);
 
 	unsigned char *cloud_data_ptr = &(cloud.data[0]);
-
   float data_array[3];
   for (unsigned int i=0; i<cloud.width; i++) {
     if (map_points[i] && map_points.at(i)->nObs >= min_observations_per_point_) {//nObs isBad()
+    // if (map_points[i]) {//nObs isBad()
       data_array[0] = map_points.at(i)->GetWorldPos().at<float> (2); //x. Do the transformation by just reading at the position of z instead of x
       data_array[1] = -1.0* map_points.at(i)->GetWorldPos().at<float> (0); //y. Do the transformation by just reading at the position of x instead of y
       data_array[2] = -1.0* map_points.at(i)->GetWorldPos().at<float> (1); //z. Do the transformation by just reading at the position of y instead of z
@@ -226,9 +233,8 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
   int mTrackingState = orb_slam_->GetTrackingState();
   int N = mvCurrentKeys.size();
 
-  cv::Mat im = cv::Mat::zeros(480,640, CV_32F);
-  // cv::Mat im = cv::Mat::zeros(720,960, CV_32F);
-  // TODO: handle different inmage sizes, maybe publish pointclouds?
+  cv::Mat im = cv::Mat::zeros(cHeight,cWidth, CV_32F);
+  int pointcount = 0;
 
   if(mTrackingState==ORB_SLAM2::Tracking::OK)
   {
@@ -239,6 +245,9 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
           {
               if(!pTracker->mCurrentFrame.mvbOutlier[i])
               {
+
+                if(pMP->nObs < min_observations_per_point_)
+                  continue;
                 // 3D in absolute coordinates
                 cv::Mat P = pMP->GetWorldPos(); 
 
@@ -271,11 +280,62 @@ cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::Tracking *pTracker) {
 
                 // cout << mvCurrentKeys[i].pt.x << ", " << mvCurrentKeys[i].pt.y << endl;
                 im.at<float>(mvCurrentKeys[i].pt) = dist;
+                pointcount++;
               }
           }
       }
   }
 
+  // cout << "Points in frame: " << pointcount << endl;
+  return im;
+}
+
+cv::Mat Node::ProjectMapPointsInFrame(ORB_SLAM2::KeyFrame *pKeyFrame) {
+  vector<cv::KeyPoint> mvCurrentKeys=pKeyFrame->mvKeys;
+  std::vector<ORB_SLAM2::MapPoint*> mvpCurrentMapPoints=pKeyFrame->GetMapPointMatches();
+  int N = mvCurrentKeys.size();
+
+  cv::Mat im = cv::Mat::zeros(cHeight,cWidth, CV_32F);
+  int pointcount = 0;
+
+  for(int i=0;i<N;i++)
+  {
+      ORB_SLAM2::MapPoint* pMP = mvpCurrentMapPoints[i];
+      if(pMP)
+      {
+        if(pMP->nObs < min_observations_per_point_)
+          continue;
+        // 3D in absolute coordinates
+        cv::Mat P = pMP->GetWorldPos(); 
+
+        // 3D in camera coordinates
+        cv::Mat mTcw = pKeyFrame->GetPose();
+        cv::Mat mRcw = mTcw.rowRange(0,3).colRange(0,3);
+        cv::Mat mtcw = mTcw.rowRange(0,3).col(3);
+        cv::Mat mOw = -mRcw.t()*mtcw;
+
+        const cv::Mat Pc = mRcw*P+mtcw;
+        const float &PcZ = Pc.at<float>(2);
+
+        // Check positive depth
+        if(PcZ<0.0f)
+          continue;
+
+        // Check distance is in the scale invariance region of the MapPoint
+        const float maxDistance = pMP->GetMaxDistanceInvariance();
+        const float minDistance = pMP->GetMinDistanceInvariance();
+        const cv::Mat PO = P-mOw;
+        float dist = cv::norm(PO);
+
+        if(dist<minDistance || dist>maxDistance)
+          continue;
+
+        im.at<float>(mvCurrentKeys[i].pt) = dist;
+        pointcount++;
+      }
+  }
+
+  // cout << "Points in frame: " << pointcount << endl;
   return im;
 }
 

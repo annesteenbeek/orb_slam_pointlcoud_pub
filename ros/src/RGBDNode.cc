@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     ros::NodeHandle node_handle;
     image_transport::ImageTransport image_transport (node_handle);
 
-    RGBDNode node (&SLAM, node_handle, image_transport);
+    RGBDNode node (&SLAM, node_handle, image_transport, argv[2]);
 
     ros::spin();
 
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 }
 
 
-RGBDNode::RGBDNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport) : Node (pSLAM, node_handle, image_transport) {
+RGBDNode::RGBDNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport, const string &strSettingsFile) : Node (pSLAM, node_handle, image_transport, strSettingsFile) {
   rgb_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle, "/camera/rgb/image_raw", 1);
   depth_subscriber_ = new message_filters::Subscriber<sensor_msgs::Image> (node_handle, "/camera/depth_registered/image_raw", 1);
 

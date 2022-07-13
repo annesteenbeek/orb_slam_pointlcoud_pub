@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     message_filters::Synchronizer<sync_pol> sync(sync_pol(10), left_sub,right_sub);
 
     // initilaize
-    StereoNode node (&SLAM, node_handle, image_transport);
+    StereoNode node (&SLAM, node_handle, image_transport, argv[2]);
 
     // register callbacks
     sync.registerCallback(boost::bind(&StereoNode::ImageCallback, &node,_1,_2));
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 }
 
 
-StereoNode::StereoNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport) : Node (pSLAM, node_handle, image_transport) {
+StereoNode::StereoNode (ORB_SLAM2::System* pSLAM, ros::NodeHandle &node_handle, image_transport::ImageTransport &image_transport, const string &strSettingsFile) : Node (pSLAM, node_handle, image_transport, strSettingsFile) {
 }
 
 
